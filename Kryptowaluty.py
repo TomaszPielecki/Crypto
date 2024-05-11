@@ -92,7 +92,8 @@ try:
         test_data = yf.download(f'{crypto}-{against}', start=test_start, end=test_end)
         actual_price = test_data['Adj Close'].values
 
-        total_dataset = concat((data['Adj Close'], test_data['Adj Close']), axis=0)
+        total_dataset = concat((data['Adj Close'], test_data['Adj '
+                                                             'Close']), axis=0)
         model_inputs = total_dataset[len(total_dataset) - len(test_data) - prediction_days:].values
         model_inputs = model_inputs.reshape(-1, 1)
         scaler.fit(model_inputs)
