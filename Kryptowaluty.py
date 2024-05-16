@@ -1,23 +1,30 @@
 # -*- coding: utf-8 -*-
 import datetime as dt
+import os
+import sqlite3
+import time
 
 import matplotlib.pyplot as plt
 import numpy as np
+import schedule
 import yfinance as yf
+from keras import Sequential, Input
+from keras.src.layers import LSTM, Dropout, Dense
+from keras.src.optimizers import Adam
+from keras.src.saving import load_model
 from numpy import array, reshape
 from pandas import concat
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.python.keras.engine.sequential import Sequential
-from tensorflow.python.keras.layers import Dense, LSTM, Dropout
-from tensorflow.python.keras.models import load_model
+
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '1'
 
 
-
-def main():
+def main(prediction_days, crypto, against, prediction):
     print("Prediction Algorithm: Cryptocurrency Yahoo API")
     prediction_future_date = dt.datetime.now() + dt.timedelta(days=prediction_days)
     print(
-        f"Your cryptocurrency prediction for {crypto} on {prediction_future_date.strftime('%Y-%m-%d')} is {prediction[0][0]:.2f} {against}")
+        f"Your cryptocurrency prediction for {crypto} on {prediction_future_date.strftime('%Y-%m-%d')} "
+        f"is {prediction[0][0]:.2f} {against}")
 
 
 def get_user_input():
@@ -43,8 +50,8 @@ def get_user_input():
                 raise ValueError("Invalid currency symbol.")
 
             return future_days, crypto, against
-        except ValueError as ve:
-            print(f"Error: {ve}. Please try again.")
+        except ValueError as VE:
+            print(f"Error: {VE}. Please try again.")
 
 
 def download_data(crypto, against, start_date, end_date):
@@ -56,7 +63,7 @@ def download_data(crypto, against, start_date, end_date):
 
 def prepare_data(data, prediction_days, future_days):
     scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_data = scaler.fit_transform(data['Adj Close'].values.reshape(-1, 1))
+    scaled_data = scaler.fit_transform(data['Close'].values.reshape(-1, 1))
 
     x_train, y_train = [], []
     for x in range(prediction_days, len(scaled_data) - future_days):
@@ -70,19 +77,55 @@ def prepare_data(data, prediction_days, future_days):
 
 
 def build_model(input_shape):
-    model = Sequential([
-        LSTM(units=50, return_sequences=True, input_shape=input_shape),
-        Dropout(0.2),
-        LSTM(units=50, return_sequences=True),
-        Dropout(0.2),
-        LSTM(units=50),
-        Dropout(0.2),
+    model = Sequential()
+    model.add(Input(shape=(input_shape[1], 1)))
+    model.add(LSTM(units=50, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(LSTM(units=50, return_sequences=True))
+    model.add(Dropout(0.2))
+    model.add(LSTM(units=50))
+    model.add(Dropout(0.2))
+    model.add(Dense(units=1))
 
-        Dense(units=1)
-    ])
+    optimizer = Adam(learning_rate=0.001)
+    model.compile(optimizer=optimizer, loss='mean_squared_error', metrics=['mse'])
 
-    model.compile(optimizer='adam', loss='mean_squared_error', metrics=['mse'])
     return model
+
+
+def save_model(model, crypto):
+    model.save(f'model_{crypto}.keras')
+
+
+def load_existing_model(crypto):
+    try:
+        model = load_model(f'model_{crypto}.keras')
+        return model
+    except Exception as E:
+        print(f"Could not load model for {crypto}: {E}")
+        return None
+
+
+def create_database():
+    conn = sqlite3.connect('crypto_predictions.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS predictions (
+                        id INTEGER PRIMARY KEY,
+                        date TEXT NOT NULL,
+                        crypto TEXT NOT NULL,
+                        prediction_prices TEXT NOT NULL)''')
+    conn.commit()
+    conn.close()
+
+
+def save_prediction_to_db(crypto, prediction_prices):
+    conn = sqlite3.connect('crypto_predictions.db')
+    cursor = conn.cursor()
+    for prediction_value in prediction_prices:
+        cursor.execute("INSERT INTO predictions (date, crypto, prediction) VALUES (?, ?, ?)",
+                       (dt.datetime.now().strftime('%Y-%m-%d'), crypto, prediction_value))
+    conn.commit()
+    conn.close()
 
 
 def plot_results(test_data, actual_price, prediction_prices, crypto, prediction, future_days):
@@ -105,8 +148,53 @@ def predict_future(model, scaler, scaled_data, prediction_days):
     return future_prediction
 
 
+def update_data_and_predict():
+    future_days, crypto, against = 1, 'BTC', 'USD'  # Example values for daily update
+    start_date = dt.datetime.now() - dt.timedelta(365 * 4)
+    end_date = dt.datetime.now()
+
+    data = download_data(crypto, against, start_date, end_date)
+    prediction_days = 60
+    x_train, y_train, scaler = prepare_data(data, prediction_days, future_days)
+
+    model = load_existing_model(crypto)
+    if model is None:
+        model = build_model((x_train.shape[1], 1))
+        model.fit(x_train, y_train, epochs=50, batch_size=32)
+        save_model(model, crypto)
+    else:
+        model.fit(x_train, y_train, epochs=10, batch_size=32)  # Fine-tuning
+        save_model(model, crypto)
+
+    test_data = yf.download(f'{crypto}-{against}', start=start_date, end=end_date)
+    actual_price = test_data['Close'].values
+
+    total_dataset = concat((data['Close'], test_data['Close']), axis=0)
+    model_inputs = total_dataset[len(total_dataset) - len(test_data) - prediction_days:].values
+    model_inputs = model_inputs.reshape(-1, 1)
+    scaler.fit(model_inputs)
+    model_inputs = scaler.transform(model_inputs)
+
+    x_test = []
+    for x in range(prediction_days, len(model_inputs)):
+        x_test.append(model_inputs[x - prediction_days:x, 0])
+
+    x_test = array(x_test)
+    x_test = reshape(x_test, (x_test.shape[0], x_test.shape[1], 1))
+
+    prediction_prices = model.predict(x_test)
+    prediction_prices = scaler.inverse_transform(prediction_prices)
+
+    prediction = predict_future(model, scaler, model_inputs, prediction_days)
+
+    plot_results(test_data, actual_price, prediction_prices, crypto, prediction, future_days)
+    main(prediction_days, crypto, against, prediction)
+    save_prediction_to_db(crypto, prediction)
+
+
 def run_prediction():
     future_days, crypto, against = get_user_input()
+    create_database()
     while future_days is not None:
         start_date = dt.datetime.now() - dt.timedelta(365 * 4)
         end_date = dt.datetime.now()
@@ -118,11 +206,12 @@ def run_prediction():
 
         model = build_model((x_train.shape[1], 1))
         model.fit(x_train, y_train, epochs=50, batch_size=32)
+        save_model(model, crypto)
 
         test_data = yf.download(f'{crypto}-{against}', start=start_date, end=end_date)
-        actual_price = test_data['Adj Close'].values
+        actual_price = test_data['Close'].values
 
-        total_dataset = concat((data['Adj Close'], test_data['Adj Close']), axis=0)
+        total_dataset = concat((data['Close'], test_data['Close']), axis=0)
         model_inputs = total_dataset[len(total_dataset) - len(test_data) - prediction_days:].values
         model_inputs = model_inputs.reshape(-1, 1)
         scaler.fit(model_inputs)
@@ -141,15 +230,24 @@ def run_prediction():
         prediction = predict_future(model, scaler, model_inputs, prediction_days)
 
         plot_results(test_data, actual_price, prediction_prices, crypto, prediction, future_days)
+        main(prediction_days, crypto, against, prediction)
+        save_prediction_to_db(crypto, prediction)
 
         future_days, crypto, against = get_user_input()
 
 
 if __name__ == '__main__':
-    try:
-        run_prediction()
-        print("End of program.")
-    except ValueError as ve:
-        print(f"Error: {ve}")
-    except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+    create_database()
+    schedule.every().day.at("00:00").do(update_data_and_predict)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
+
+        try:
+            run_prediction()
+            print("End of program.")
+        except ValueError as ve:
+            print(f"Error: {ve}")
+        except Exception as e:
+            print(f"An unexpected error occurred: {e}")
