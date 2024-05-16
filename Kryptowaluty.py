@@ -113,7 +113,7 @@ def create_database():
                         id INTEGER PRIMARY KEY,
                         date TEXT NOT NULL,
                         crypto TEXT NOT NULL,
-                        prediction_prices TEXT NOT NULL)''')
+                        prediction_prices REAL NOT NULL)''')
     conn.commit()
     conn.close()
 
@@ -121,9 +121,12 @@ def create_database():
 def save_prediction_to_db(crypto, prediction_prices):
     conn = sqlite3.connect('crypto_predictions.db')
     cursor = conn.cursor()
+
     for prediction_value in prediction_prices:
-        cursor.execute("INSERT INTO predictions (date, crypto, prediction) VALUES (?, ?, ?)",
-                       (dt.datetime.now().strftime('%Y-%m-%d'), crypto, prediction_value))
+        if isinstance(prediction_value, np.ndarray):  # Check if prediction_value is a NumPy array
+            prediction_value = prediction_value[0]  # Extract the first element if prediction_value is an array
+        cursor.execute("INSERT INTO predictions (date, crypto, prediction_prices) VALUES (?, ?, ?)",
+                       (dt.datetime.now().strftime('%Y-%m-%d'), crypto, float(prediction_value)))
     conn.commit()
     conn.close()
 
