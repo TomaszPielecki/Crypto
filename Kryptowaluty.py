@@ -63,7 +63,7 @@ def download_data(crypto, against, start_date, end_date):
 
 def prepare_data(data, prediction_days, future_days):
     scaler = MinMaxScaler(feature_range=(0, 1))
-    scaled_data = scaler.fit_transform(data['Close'].values.reshape(-1, 1))
+    scaled_data = scaler.fit_transform(data['Adj Close'].values.reshape(-1, 1))
 
     x_train, y_train = [], []
     for x in range(prediction_days, len(scaled_data) - future_days):
@@ -170,9 +170,9 @@ def update_data_and_predict():
         save_model(model, crypto)
 
     test_data = yf.download(f'{crypto}-{against}', start=start_date, end=end_date)
-    actual_price = test_data['Close'].values
+    actual_price = test_data['Adj Close'].values
 
-    total_dataset = concat((data['Close'], test_data['Close']), axis=0)
+    total_dataset = concat((data['Adj Close'], test_data['Adj Close']), axis=0)
     model_inputs = total_dataset[len(total_dataset) - len(test_data) - prediction_days:].values
     model_inputs = model_inputs.reshape(-1, 1)
     scaler.fit(model_inputs)
@@ -212,9 +212,9 @@ def run_prediction():
         save_model(model, crypto)
 
         test_data = yf.download(f'{crypto}-{against}', start=start_date, end=end_date)
-        actual_price = test_data['Close'].values
+        actual_price = test_data['Adj Close'].values
 
-        total_dataset = concat((data['Close'], test_data['Close']), axis=0)
+        total_dataset = concat((data['Adj Close'], test_data['Adj Close']), axis=0)
         model_inputs = total_dataset[len(total_dataset) - len(test_data) - prediction_days:].values
         model_inputs = model_inputs.reshape(-1, 1)
         scaler.fit(model_inputs)
