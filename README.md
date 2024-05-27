@@ -45,6 +45,9 @@ To get started with this project, follow these steps:
 - **crypto_prediction.py**: The main script that handles data download, preprocessing, model training, prediction, and results visualization.
 - **models/**: Directory where trained models are saved.
 - **crypto_predictions.db**: SQLite database to store prediction results.
+- 
+
+![wybor_Kryptowaluty](https://github.com/TomaszPielecki/Crypto/blob/Kryptowaluty/wybor_Kryptowaluty.png)
 
 ### Main Functions
 
@@ -55,7 +58,7 @@ def main(prediction_days, crypto, against, prediction):
     print(f'Your cryptocurrency prediction for {crypto} on {prediction_future_date.strftime('%Y-%m-%d')} is {prediction[0][0]:.2f} {against}')
 
 
-![wybor_Kryptowaluty](https://github.com/TomaszPielecki/Crypto/blob/Kryptowaluty/wybor_Kryptowaluty.png)
+
 
 
 
