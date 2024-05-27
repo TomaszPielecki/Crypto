@@ -55,7 +55,7 @@ def main(prediction_days, crypto, against, prediction):
     print(f'Your cryptocurrency prediction for {crypto} on {prediction_future_date.strftime('%Y-%m-%d')} is {prediction[0][0]:.2f} {against}')
 
 
-[wybor_Kryptowaluty](https://github.com/TomaszPielecki/Crypto/blob/Kryptowaluty/wybor_Kryptowaluty.png)
+![wybor_Kryptowaluty](https://github.com/TomaszPielecki/Crypto/blob/Kryptowaluty/wybor_Kryptowaluty.png)
 
 
 
