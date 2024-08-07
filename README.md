@@ -14,7 +14,7 @@ To get started with this project, follow these steps:
 
 1. **Clone the repository**:
     ```sh
-    git clone https://github.com/yourusername/crypto-prediction.git
+    git clone https://github.com/TomaszPielecki/crypto-prediction.git
     cd crypto-prediction
     ```
 
