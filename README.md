@@ -45,6 +45,9 @@ To get started with this project, follow these steps:
 - **crypto_prediction.py**: The main script that handles data download, preprocessing, model training, prediction, and results visualization.
 - **models/**: Directory where trained models are saved.
 - **crypto_predictions.db**: SQLite database to store prediction results.
+- 
+
+![wybor_Kryptowaluty](https://github.com/TomaszPielecki/Crypto/blob/Kryptowaluty/wybor_Kryptowaluty.png)
 
 ![wybor_Kryptowaluty](https://github.com/TomaszPielecki/Crypto/blob/Kryptowaluty/wybor_Kryptowaluty.png)
 
